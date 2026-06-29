@@ -1,0 +1,4 @@
+sigmoid_colon_H3K4me3_1	sigmoid_colon_H3K4me3_1_run1	/home/arodrigo/Documents/MScOmicsDA/Epigenomics/epigenomics_uvic/ChIP-seq/data/fastq.files/ENCFF166KFA.sub.fastq	sigmoid_colon_control_1	H3K4me3
+sigmoid_colon_H3K4me3_1	sigmoid_colon_H3K4me3_1_run2	/home/arodrigo/Documents/MScOmicsDA/Epigenomics/epigenomics_uvic/ChIP-seq/data/fastq.files/ENCFF963MZL.sub.fastq	sigmoid_colon_control_1	H3K4me3
+sigmoid_colon_control_1	sigmoid_colon_control_1_run1	/home/arodrigo/Documents/MScOmicsDA/Epigenomics/epigenomics_uvic/ChIP-seq/data/fastq.files/ENCFF102SFU.sub.fastq	sigmoid_colon_control_1	input
+sigmoid_colon_control_1	sigmoid_colon_control_1_run2	/home/arodrigo/Documents/MScOmicsDA/Epigenomics/epigenomics_uvic/ChIP-seq/data/fastq.files/ENCFF599MFK.sub.fastq	sigmoid_colon_control_1	input

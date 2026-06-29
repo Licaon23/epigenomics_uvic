@@ -1,0 +1,17 @@
+# Nextflow / pipeline intermediate files
+ChIP-seq/chip-nf/work/
+ChIP-seq/chip-nf/.nextflow/
+ChIP-seq/chip-nf/.nextflow.log*
+ChIP-seq/chip-nf/pipeline.log.txt
+ChIP-seq/chip-nf/.nextflow.pid
+
+# Downloaded FASTQ / reference / processed data
+ChIP-seq/data/fastq.files/
+ChIP-seq/chip-nf/refs/
+*.fastq
+*.fastq.gz
+*.bam
+*.sam
+*.gem
+*.bigWig
+*.bigBed
