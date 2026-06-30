@@ -1,0 +1,4 @@
+ENCFF668DFB	sigmoid_colon	H3K4me3-human
+ENCFF502IJF	stomach	H3K4me3-human
+ENCFF477DXO	sigmoid_colon	POLR2A-human
+ENCFF979WAV	stomach	POLR2A-human

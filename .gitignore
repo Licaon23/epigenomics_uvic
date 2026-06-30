@@ -15,3 +15,7 @@ ChIP-seq/chip-nf/refs/
 *.gem
 *.bigWig
 *.bigBed
+
+# ChIP-seq data and annotations
+ChIP-seq/data/
+ChIP-seq/annotation/

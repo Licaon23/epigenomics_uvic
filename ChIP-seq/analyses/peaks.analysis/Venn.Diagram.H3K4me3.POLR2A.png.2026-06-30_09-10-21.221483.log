@@ -1,0 +1,23 @@
+INFO [2026-06-30 09:10:21] $x
+INFO [2026-06-30 09:10:21] list(setA, setB, setC, setD)
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $category.names
+INFO [2026-06-30 09:10:21] c("stomach H3K4me3", "stomach POLR2A", "sigmoid_colon H3K4me3", 
+INFO [2026-06-30 09:10:21]     "sigmoid_colon POLR2A")
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $filename
+INFO [2026-06-30 09:10:21] opt$output
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $output
+INFO [2026-06-30 09:10:21] [1] TRUE
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $col
+INFO [2026-06-30 09:10:21] [1] "black"
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $fill
+INFO [2026-06-30 09:10:21] c(alpha("#1f78b4", 1), alpha("#cc4c02", 1), alpha("#1f78b4", 
+INFO [2026-06-30 09:10:21]     0.4), alpha("#cc4c02", 0.4))
+INFO [2026-06-30 09:10:21] 
+INFO [2026-06-30 09:10:21] $width
+INFO [2026-06-30 09:10:21] [1] 5000
+INFO [2026-06-30 09:10:21] 
