@@ -1,0 +1,5 @@
+tissue	analysis	n_peaks
+sigmoid_colon	peaks_intersecting_promoters	47871
+sigmoid_colon	peaks_outside_gene_body_coordinates	37035
+stomach	peaks_intersecting_promoters	44749
+stomach	peaks_outside_gene_body_coordinates	34537

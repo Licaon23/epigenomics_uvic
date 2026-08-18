@@ -1,0 +1,134 @@
+######## 
+# ATAC-Seq exercise
+#####
+
+# Enter the docker
+docker run -v $PWD:$PWD -w $PWD --rm -it dgarrimar/epigenomics_course
+
+# And go to ATAC-seq directory
+
+# Create directories to store data
+mkdir -p data/bigBed.files data/bed.files
+mkdir analyses
+mkdir annotation
+
+
+# Download the metadata
+# * Search in ENCODE data - funcitonal genomics experiments for individual ENCDO451RUA --> filoter by Assay type: ATAC-seq + Biosample stomach&sigmoidColon --> downloaded selected files
+https://www.encodeproject.org/report/?type=Experiment&replicates.library.biosample.donor.uuid=d370683e-81e7-473f-8475-7716d027849b&status=released&status=submitted&status=in+progress&limit=all&assay_title=ATAC-seq&biosample_ontology.term_name=stomach&biosample_ontology.term_name=sigmoid+colon
+
+
+../bin/download.metadata.sh "https://www.encodeproject.org/metadata/?replicates.library.biosample.donor.uuid=d370683e-81e7-473f-8475-7716d027849b&status=released&status=submitted&status=in+progress&assay_title=ATAC-seq&biosample_ontology.term_name=stomach&biosample_ontology.term_name=sigmoid+colon&type=Experiment"
+
+
+# Retrieve from metadata ATAC-seq peaks (bigBed narrow and pseudoreplicated peaks) and assembly GRCh38 for stomach and sigmoid colon for the same donor. Make sure the md5sum values coincide with the ones provided by ENCODE.
+head -n 1 metadata.tsv | awk -F'\t' '{for (i=1; i<=NF; i++) print i, $i}' 
+
+# We can see that fields 1,8,11 and 4 provide info regarding file accession, assay, biosample, file format and output type. We need to parse bigBed_narrow peaks files for pseudoreplicated peaks in GRCh37 assemblt
+
+
+grep -F ATAC-seq metadata.tsv |\
+grep -F "bigBed_narrowPeak" |\
+grep -F "pseudoreplicated_peaks" |\
+grep -F "GRCh38" |\
+awk 'BEGIN{FS=OFS="\t"}{print $1, $11, $4, $6, $46}' > analyses/bigBed.peaks.ids.txt
+
+#Then, select file accession (first column) and loop over the list to download each file from ENCODE using wget and store it into bigBed.files directory in data/
+
+cut -f1 analyses/bigBed.peaks.ids.txt |\
+while read filename; do
+wget -P data/bigBed.files "https://www.encodeproject.org/files/$filename/@@download/$filename.bigBed"
+done
+
+
+## Verify that MD5sum code for files correspond to the given one.
+# Briefly, we used the file accession of each bigBed file to calculate the md5sum, and compare to the original one which was already retrieved previously in the same id file. Then, we check whether the original and calculated differ.
+
+awk 'BEGIN{FS=OFS="\t"} {print $1, $6}' analyses/bigBed.peaks.ids.txt | \
+while read filename original_md5sum; do
+  computed_md5sum=$(md5sum data/bigBed.files/"$filename".bigBed | awk '{print $1}')
+  printf "%s\t%s\t%s\n" "$filename" "$original_md5sum" "$computed_md5sum"
+done > data/bigBed.files/md5sum.txt
+
+awk '$2 != $3' data/bigBed.files/md5sum.txt
+
+# For each tissue, run an intersection analysis using BEDTools. Report: 
+# 1) The number of peaks that intersect the promoter regions
+# 2) The number of peaks that fall outside gene coordinates (whole gene body, not just the promoter regions).
+
+# First, we need to convert the bigBed to bed format
+
+cut -f1 analyses/bigBed.peaks.ids.txt |\
+while read filename; do
+  bigBedToBed data/bigBed.files/"$filename".bigBed data/bed.files/"$filename".bed
+done
+
+# Secondly, we need download the annotations files needed: 1) the GRCh38 V24 gencode assembly, in order to get the coordinates of gene bodies; 2) A list of promoters (-2kb to +2kb) from TSS of protein-coding genes
+
+wget -P annotation "https://www.encodeproject.org/files/gencode.v24.primary_assembly.annotation/@@download/gencode.v24.primary_assembly.annotation.gtf.gz"
+wget --no-check-certificate -P annotation "https://public-docs.crg.es/rguigo/Data/bborsari/UVIC/epigenomics_course/gencode.v24.protein.coding.non.redundant.TSS.bed"
+ 
+# Then, we need to prepare the bed file with gene coordinates for protein coding genes
+
+gunzip annotation/gencode.v24.primary_assembly.annotation.gtf.gz
+
+awk '$3=="gene"' annotation/gencode.v24.primary_assembly.annotation.gtf |\     
+grep -F "protein_coding" |\    
+cut -d ";" -f1 |\  
+awk 'BEGIN{OFS="\t"}{print $1, $4, $5, $10, 0, $7, $10}' |\  
+sed 's/\"//g' |\
+awk 'BEGIN{FS=OFS="\t"}$1!="chrM"{$2=($2-1); print $0}' > annotation/gencode.v24.protein.coding.gene.body.bed
+
+#· gets the third column and check if it has gene on it
+#·filter rows containf protein_coding (fixed)
+#·· last colum of attributes are separated by ; This insructions stabilish delimiter ; and keeps the first column, as if it was all in the same column with tab delimiters
+#· then takes this in delimiters and print the columns of interest
+#· sed: stream editor (text transformer). --> s/···/···/ substitution command  -- \" get this literal ", substitue with nothing //, apply globally g --> this is to remove the "" quotes for the annotations
+#· select those that do not contain chrM in the chromosome column (1) AND
+#  transform the cooridante system to 1-based (gtf) to 0-based (BED). 1 based puts the coordinate exactly on the bp, whereas 0-based are in between. (substract 1 to the start). 
+#  So, this gets all rows not containing chrM, and mutate the start column substracting 1 and return the whole line.
+#· pipe the output to a new file in BED format.
+
+
+# Intersection analysis: promoter regions or gene bodies
+#We then use this list of genes (bedfile) to compare how many peaks overlap the promoter regions, or fall outside the gene body
+# * From the bigBed index file, we select the two first coluumn (-f-2), ID and tissue
+# * Then, using the while clause for the two column (filename, tissue)
+#    - Run the bedtools intersect command
+#    - First file is the bedfile for ATAC-seq peaks.
+#      The second is the gencode bedfile for TSS non redudant protein coding genes, start-end coordinates, or the gene body coordinates.
+#      It checks, for each peak delimited by start and end coordinates(-a), does this interval overlap promoter region or gene body?
+#    - If yes, it reports the particular peak from -a
+#    - u flag indicate that we report this match only once, in case the same peak overlaps with one or more promoter regions or is a match for more than one gene bodies.
+#    - In the intersection analysis out of gene bodies, use the -v flag in order to report those peaks (-a) that have no overlap with any gene body interval coordinates (-b)
+
+
+echo -e "tissue\tanalysis\tn_peaks" > analyses/peaks.intersections.summary.tsv
+
+cut -f-2 analyses/bigBed.peaks.ids.txt |\
+while read filename tissue; do 
+
+  promoter_out="analyses/peaks.intersect.promoter.${tissue}.bed"
+  outside_gene_out="analyses/peaks.outside.geneBodyCoordinates.${tissue}.bed"
+
+  bedtools intersect \
+    -a data/bed.files/"$filename".bed \
+    -b annotation/gencode.v24.protein.coding.non.redundant.TSS.bed \
+    -u > "$promoter_out"
+
+  bedtools intersect \
+    -a data/bed.files/"$filename".bed \
+    -b annotation/gencode.v24.protein.coding.gene.body.bed \
+    -v > "$outside_gene_out"
+
+  n_promoter=$(wc -l < "$promoter_out")
+  n_outside_gene=$(wc -l < "$outside_gene_out")
+
+  echo -e "${tissue}\tpeaks_intersecting_promoters\t${n_promoter}" >> analyses/peaks.intersections.summary.tsv
+  echo -e "${tissue}\tpeaks_outside_gene_body_coordinates\t${n_outside_gene}" >> analyses/peaks.intersections.summary.tsv
+
+done
+
+# Report word count (lines) for each intersection analysis
+column -t -s $'\t' analyses/peaks.intersections.summary.tsv
+
