@@ -254,3 +254,10 @@ end
 
 column -t -s $'\t' analyses/distance.summary.txt
 ```
+
+These are the results:
+
+| Tissue        | Median.distance | Mean.distance |
+|---------------|----------------:|--------------:|
+| stomach       |           27728 |      45370.43 |
+| sigmoid_colon |           35802 |      73635.89 |
