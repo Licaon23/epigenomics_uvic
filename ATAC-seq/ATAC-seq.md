@@ -30,8 +30,8 @@ mkdir annotation
 
 ## 2. Download the metadata
 
-The metadata was obtained from **ENCODE – functional genomics experiments** for
-the individual donor `ENCDO451RUA`, filtering by **Assay type: ATAC‑seq** and
+The metadata was obtained from **ENCODE -  functional genomics experiments** for
+the individual donor `ENCDO451RUA`, filtering by **Assay type: ATAC-seq** and
 **Biosample: stomach & sigmoid colon**, and downloading the selected files.
 
 Reference report URL (ENCODE portal):
@@ -40,7 +40,7 @@ Reference report URL (ENCODE portal):
 https://www.encodeproject.org/report/?type=Experiment&replicates.library.biosample.donor.uuid=d370683e-81e7-473f-8475-7716d027849b&status=released&status=submitted&status=in+progress&limit=all&assay_title=ATAC-seq&biosample_ontology.term_name=stomach&biosample_ontology.term_name=sigmoid+colon
 ```
 
-Download the metadata file with the provided helper script:
+Download the metadata file:
 
 ```bash
 ../bin/download.metadata.sh "https://www.encodeproject.org/metadata/?replicates.library.biosample.donor.uuid=d370683e-81e7-473f-8475-7716d027849b&status=released&status=submitted&status=in+progress&assay_title=ATAC-seq&biosample_ontology.term_name=stomach&biosample_ontology.term_name=sigmoid+colon&type=Experiment"
@@ -48,10 +48,10 @@ Download the metadata file with the provided helper script:
 
 ---
 
-## 3. Retrieve the ATAC‑seq peak files
+## 3. Retrieve the ATAC-seq peak files
 
-We retrieve from the metadata the ATAC‑seq peaks (bigBed narrow, pseudoreplicated
-peaks) for assembly **GRCh38**, for stomach and sigmoid colon from the same
+From the metadata the ATAC-seq peaks (bigBed narrow, pseudoreplicated
+peaks) were retrieved for assembly **GRCh38**, for stomach and sigmoid colon from the same
 donor, making sure the md5sum values coincide with the ones provided by ENCODE.
 
 First, inspect the header to identify the relevant fields:
@@ -61,7 +61,7 @@ head -n 1 metadata.tsv | awk -F'\t' '{for (i=1; i<=NF; i++) print i, $i}'
 ```
 
 Fields 1, 8, 11 and 4 provide the information on file accession, assay,
-biosample, file format and output type. We need to parse the **bigBed narrowPeak**
+biosample, file format and output type. Parse the **bigBed narrowPeak**
 files for **pseudoreplicated peaks** in the **GRCh38** assembly.
 
 ```bash
@@ -72,7 +72,7 @@ grep -F "GRCh38" |\
 awk 'BEGIN{FS=OFS="\t"}{print $1, $11, $4, $6, $46}' > analyses/bigBed.peaks.ids.txt
 ```
 
-Then we select the file accession (first column) and loop over the list to
+Then the file accession (first column) is selected and loop over the list to
 download each file from ENCODE using `wget`, storing it in `data/bigBed.files`.
 
 ```bash
@@ -86,9 +86,9 @@ done
 
 ## 4. Verify the md5sum of the downloaded files
 
-We use the file accession of each bigBed file to compute the md5sum and compare
+The file accession of each bigBed file is used to compute the md5sum and compare
 it with the original one, which was already retrieved previously in the same id
-file. We then check whether the original and computed values differ.
+file. Then it was check whether the original and computed values differ.
 
 ```bash
 awk 'BEGIN{FS=OFS="\t"} {print $1, $6}' analyses/bigBed.peaks.ids.txt | \
@@ -108,7 +108,7 @@ checksum.
 
 ## 5. Intersection analysis: promoters and gene bodies
 
-For each tissue we run an intersection analysis with **BEDTools** and report:
+For each tissue an intersection analysis was run with **BEDTools** and report:
 
 1. the number of peaks that intersect the **promoter regions**, and
 2. the number of peaks that fall **outside gene coordinates** (the whole gene
@@ -125,16 +125,16 @@ done
 
 ### 5.2 Download the annotation files
 
-We download the annotations needed: (1) the **GRCh38 v24 GENCODE** assembly, to
-get the coordinates of the gene bodies; and (2) a list of **promoters (−2 kb to
-+2 kb)** around the TSS of protein‑coding genes.
+Download the annotations needed: (1) the **GRCh38 v24 GENCODE** assembly, to
+get the coordinates of the gene bodies, and (2) a list of **promoters (�-2 kb to
++2 kb)** around the TSS of protein-coding genes.
 
 ```bash
 wget -P annotation "https://www.encodeproject.org/files/gencode.v24.primary_assembly.annotation/@@download/gencode.v24.primary_assembly.annotation.gtf.gz"
 wget --no-check-certificate -P annotation "https://public-docs.crg.es/rguigo/Data/bborsari/UVIC/epigenomics_course/gencode.v24.protein.coding.non.redundant.TSS.bed"
 ```
 
-### 5.3 Prepare the gene‑body BED file for protein‑coding genes
+### 5.3 Prepare the gene-body BED file for protein-coding genes
 
 ```bash
 gunzip annotation/gencode.v24.primary_assembly.annotation.gtf.gz
@@ -151,33 +151,29 @@ Step by step, this pipeline:
 
 - gets the third column and checks whether it contains `gene`;
 - filters rows containing `protein_coding` (fixed string);
-- the last column of attributes is separated by `;` — this establishes `;` as
-  the delimiter and keeps the first field, as if it were all in the same column
-  with tab delimiters;
+- the last column of attributes is separated by `;`.The 'cut' instruction establishes `;` as
+  the delimiter and keeps the first field, as if it were all in the same column  with tab delimiters;
 - then takes these fields and prints the columns of interest;
-- `sed` (stream editor, text transformer) uses the `s/…/…/` substitution
-  command: `\"` matches the literal `"`, which is substituted with nothing
-  (`//`), applied globally (`g`) — this removes the `""` quotes from the
-  annotations;
-- selects the rows that do **not** contain `chrM` in the chromosome column (1)
-  **and** transforms the coordinate system from 1‑based (GTF) to 0‑based (BED):
-  1‑based puts the coordinate exactly on the bp, whereas 0‑based sits in between,
+- `sed` uses the substitution to remove quotes from the annotations;
+- selects the rows that do not contain `chrM` in the chromosome column (1)
+  and transforms the coordinate system from 1-based (GTF) to 0-based (BED):
+  1-based puts the coordinate exactly on the bp, whereas 0-based sits in between,
   so we subtract 1 from the start. This returns every row not containing `chrM`,
   mutating the start column by subtracting 1 and returning the whole line;
 - pipes the output to a new file in BED format.
 
 ### 5.4 Run the intersection analysis
 
-We use this list of genes (BED file) to compare how many peaks overlap the
+This list of genes (BED file) was used to compare how many peaks overlap the
 promoter regions, or fall outside the gene body.
 
-- From the bigBed index file, we select the two first columns (`-f-2`): ID and
+- From the bigBed index file, the two first columns are selected (`-f-2`): ID and
   tissue.
 - Then, using the `while` clause for the two columns (filename, tissue):
   - run the `bedtools intersect` command;
-  - the first file (`-a`) is the BED file for ATAC‑seq peaks; the second (`-b`)
-    is the GENCODE BED file for non‑redundant TSS of protein‑coding genes
-    (start–end coordinates), or the gene‑body coordinates. It checks, for each
+  - the first file (`-a`) is the BED file for ATAC-seq peaks; the second (`-b`)
+    is the GENCODE BED file for non-redundant TSS of protein-coding genes
+    (start-end coordinates), or the gene-body coordinates. It checks, for each
     peak delimited by start and end coordinates (`-a`), whether this interval
     overlaps a promoter region or a gene body;
   - if yes, it reports that particular peak from `-a`;
@@ -232,9 +228,4 @@ column -t -s $'\t' analyses/peaks.intersections.summary.tsv
 | stomach       | peaks_intersecting_promoters        |   44749 |
 | stomach       | peaks_outside_gene_body_coordinates |   34537 |
 
-In both tissues a large number of ATAC‑seq peaks intersect promoter regions
-(47,871 in sigmoid colon and 44,749 in stomach), consistent with accessible
-chromatin at the promoters of protein‑coding genes. A substantial fraction of
-peaks also falls outside gene‑body coordinates (37,035 in sigmoid colon and
-34,537 in stomach), which may correspond to distal regulatory elements such as
-enhancers.
+
