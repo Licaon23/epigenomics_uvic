@@ -1,0 +1,175 @@
+######## 
+# Regulatory elements
+#####
+
+# Enter the docker
+docker run -v $PWD:$PWD -w $PWD --rm -it dgarrimar/epigenomics_course
+
+# ····················································································
+### Task 1
+# ····················································································
+mkdir regulatory_elements
+cd regulatory_elements
+mkdir -p data/bigBed.files data/bed.files
+mkdir analyses
+mkdir annotation
+
+# ····················································································
+### Task2: Distal regulatory regions are usually found to be flanked by both H3K27ac and H3K4me1. From your starting catalogue of open regions in each tissue, select those that overlap peaks of H3K27ac AND H3K4me1 in the corresponding ###        tissue. You will get a list of candidate distal regulatory elements for each tissue. How many are they?
+### Task3: Focus on regulatory elements that are located in chromosome 1, and generate a file 'regulatory.elements.starts.tsv' that contains the name of the regulatory region (name of the original ATAC-seq peak) and the start (5')
+###        coordinate of the region
+# ····················································································
+
+# First, we need to find the metadata for ChIP-seq experiment data regarding histone markers H3K27ac and H3K4me1 for the same subject in ENCODE in stmoach and sigmoid colon
+# URL was obtinaed by filtering through these criteria
+
+../bin/download.metadata.sh "https://www.encodeproject.org/metadata/?replicates.library.biosample.donor.uuid=d370683e-81e7-473f-8475-7716d027849b&status=released&status=submitted&status=in+progress&assay_slims=DNA+binding&target.label=H3K27ac&target.label=H3K4me1&biosample_ontology.term_name=sigmoid+colon&biosample_ontology.term_name=stomach&type=Experiment"
+
+# Retrive from metadata ChIP-seq peaks for this two markers (bigBed narrow and pseudoreplicated peaks in GRCh38 assembly for stomach and sigmoid colon. Check md5sum code for correct downloading.
+# Then, select file accession (first column) and loop over the list to download each file from ENCODE using wget and store it into bigBed.files directory in data/
+
+grep -E "(H3K27ac|H3K4me1)" metadata.tsv |\
+grep -F "bigBed_narrowPeak" |\
+grep -F "pseudoreplicated_peaks" |\
+grep -F "GRCh38" |\
+awk 'BEGIN{FS=OFS="\t"}{print $1, $11, $23, $46, $55}' |\
+sort -k2,2 -k3,3 -k5,5r |\
+sort -k2,2 -k3,3 -u > analyses/bigBed.ChIPseq.peaks.ids.txt
+
+# Download
+cut -f1 analyses/bigBed.ChIPseq.peaks.ids.txt |\
+while read filename; do
+wget -P data/bigBed.files "https://www.encodeproject.org/files/$filename/@@download/$filename.bigBed"
+done
+
+# Check integrity of files through md5sum
+
+awk 'BEGIN{FS=OFS="\t"} {print $1, $4}' analyses/bigBed.ChIPseq.peaks.ids.txt | \
+while read filename original_md5sum; do
+  computed_md5sum=$(md5sum data/bigBed.files/"$filename".bigBed | awk '{print $1}')
+  printf "%s\t%s\t%s\n" "$filename" "$original_md5sum" "$computed_md5sum"
+done > data/bigBed.files/md5sum.txt
+awk '$2 != $3' data/bigBed.files/md5sum.txt
+
+# Convert bigBed files to bed
+cut -f1 analyses/bigBed.ChIPseq.peaks.ids.txt |\
+while read filename; do
+  bigBedToBed data/bigBed.files/"$filename".bigBed data/bed.files/"$filename".bed
+done
+
+# Determine which ATAC-seq peaks that lay outside gene body coordinates overlap ChIP-seq peaks of H3K27ac AND H3K4me1 in each tissue.
+# For each tissue, first obtain separately which ATAC-seq peaks overlap with each ChIP-seq markers, and keep each ATAC-seq peak ones.
+# Then, intersect both ATAC-seq peak lists and keep only those that appear in both intersection analyses.
+# Finally, count the number of rows in each final list, so we know how many regulatory elements we have obtained for each tissue.
+# Also, for task 3, we make a subset of those peaks that appear in Chromosome 1. We retrieve peak name (column 4) and the start 5' (column 2)
+
+cut -f-3 analyses/bigBed.ChIPseq.peaks.ids.txt |\
+while read filename tissue experiment; do 
+
+  bedtools intersect \
+    -a ../ATAC-seq/analyses/peaks.outside.geneBodyCoordinates."$tissue".bed \
+    -b data/bed.files/"$filename".bed \
+    -u > analyses/peaks.outside.geneBodyCoordinates."$tissue"."$experiment".bed
+done
+
+# Then, keep the ATAC-seq peaks present in both intersections. Get the two tissue names and intersect previous peak files
+
+echo -e "Element\ttissue\tCount" > analyses/summaryRegElements.tsv
+cut -f2 analyses/bigBed.ChIPseq.peaks.ids.txt |\
+sort -u |\
+while read tissue; do 
+
+  bedtools intersect \
+    -a analyses/peaks.outside.geneBodyCoordinates."$tissue".H3K27ac-human.bed \
+    -b analyses/peaks.outside.geneBodyCoordinates."$tissue".H3K4me1-human.bed \
+    -u > analyses/peaks.outside.geneBodyCoordinates."$tissue".distalRegulatoryRegions.bed
+
+    # Count number of regulatory elements per tissue
+    count=$(cat analyses/peaks.outside.geneBodyCoordinates."$tissue".distalRegulatoryRegions.bed | wc -l)
+    echo -e "Regulatory elements\t$tissue\t$count" >> analyses/summaryRegElements.tsv
+
+    # Focus on chr.1 elements and subset the name of the peak and 5' start coordinates
+    cat analyses/peaks.outside.geneBodyCoordinates."$tissue".distalRegulatoryRegions.bed |\
+    awk 'BEGIN{FS=OFS="\t"}$1=="chr1"{print $4, $2}' >> analyses/"$tissue".regulatory.elements.starts.tsv
+
+done
+
+
+column -t -s $'\t' analyses/summaryRegElements.tsv
+
+Element              tissue         Count
+Regulatory elements  sigmoid_colon  14215
+Regulatory elements  stomach        8454
+
+
+
+# ····················································································
+### Task4: Focus on protein-coding genes located on chromosome 1. From the BED file of gene body coordinates generated during ChIP-seq hand-on, prepare a tab-separated file called gene.starts.tsv which will store the name of the gene
+###        in the first column adn the start coordinate of the gene in the second column (!Genes located on miunus strand will have start coordinate at 3'
+# ····················································································
+
+cat ../ChIP-seq/annotation/gencode.v24.protein.coding.gene.body.bed |\
+awk 'BEGIN{FS=OFS="\t"} $1=="chr1" {if ($6=="+"){start=$2} else {start=$3}; print $4, start}' > annotation/gene.starts.tsv
+
+
+
+# ····················································································
+### Task5: Download or copy 'get.distance.py' script. Complete it so that for a given coordinate --start the script returns the closest genen, the start ofthe gene and the distance of the regulatory element.
+# ····················································································
+
+for line in open_input.readlines(): 
+	gene, y = line.strip().split('\t') 
+	position = int(y) 
+	distance = abs(position - enhancer_start) 
+
+	if distance < x: 
+		x = distance 
+		selectedGene = gene 
+		selectedGeneStart = position 
+
+../bin/get.distance.py --input annotation/gene.starts.tsv --start 980000
+
+Result: ENSG00000187642.9	982093	2093
+
+
+# ····················································································
+### Task6: For each regulatgory element contained int he file regulatory.elements.starts.tsv, retrive the closest gene and the distance to the closest gene using the python script from above
+# ····················································································
+
+cat regulatory.elements.starts.tsv | while read element start; do 
+   python ../bin/get.distance.py ... # to be completed by you; 
+done > regulatoryElements.genes.distances.tsv
+
+
+cut -f2 analyses/bigBed.ChIPseq.peaks.ids.txt |\
+sort -u |\
+while read tissue; do 
+    rm analyses/"$tissue".regulatoryElements.genes.distances.tsv
+    touch analyses/"$tissue".regulatoryElements.genes.distances.tsv
+    echo -e "RegulatoryElementName\tclosestGeneName\tStartCoordGene\tDistance" >> analyses/"$tissue".regulatoryElements.genes.distances.tsv
+
+    cat analyses/"$tissue".regulatory.elements.starts.tsv |\
+    while read element start; do
+        # Calculate distance from nearest gene in list and save results in out
+        out=$(python ../bin/get.distance.py --input annotation/gene.starts.tsv --start "$start")
+        # Paste regulatory element name with output
+        echo -e "$element\t$out" >> analyses/"$tissue".regulatoryElements.genes.distances.tsv
+
+    done
+
+done
+
+
+# ····················································································
+### Task7: Use R to compute the mean and the median of the distances stored in regulatoryElements.genes.distances.tsv for each tissue
+# ····················································································
+Rscript - << 'end'
+    files <- grep('regulatoryElements.genes.distance',list.files('analyses/'),value=TRUE)
+    lr <- t(sapply(c('stomach','sigmoid_colon'),function(tissue){
+        d <- read.table(paste0('analyses/',files[grep(tissue,files)]),sep='\t',header=TRUE)
+        c('Tissue'=tissue,'Median.distance'=median(d[,'Distance'],na.rm=TRUE),'Mean.distance'=round(mean(d[,'Distance'],na.rm=TRUE),2))
+    }))
+    write.table(lr,paste0('analyses/distance.summary.txt'),sep='\t',row.names=FALSE)
+end
+
+column -t -s $'\t' analyses/distance.summary.txt

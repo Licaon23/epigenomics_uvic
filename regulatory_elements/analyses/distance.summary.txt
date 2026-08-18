@@ -1,0 +1,3 @@
+"Tissue"	"Median.distance"	"Mean.distance"
+"stomach"	"27728"	"45370.43"
+"sigmoid_colon"	"35802"	"73635.89"
