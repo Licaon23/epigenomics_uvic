@@ -19,3 +19,6 @@ ChIP-seq/chip-nf/refs/
 # ChIP-seq data and annotations
 ChIP-seq/data/
 ChIP-seq/annotation/
+
+# ATAC-seq annotation file
+ATAC-seq/annotation/gencode.v24.primary_assembly.annotation.gtf
